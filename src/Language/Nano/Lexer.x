@@ -34,6 +34,17 @@ tokens :-
   \)                            { \p _ -> RPAREN p }
   \:                            { \p _ -> COLON  p }
   \,                            { \p _ -> COMMA  p }
+  "True"                        { \pos _ -> TRUE pos }
+  "False"                       { \pos _ -> FALSE pos }
+  [0-9]+                        { \pos str -> NUM pos (read str) }
+  [a-zA-Z][a-zA-Z0-9_']*        { \pos str -> ID pos str }
+  "let"      { \pos _ -> LET pos }
+  "="        { \pos _ -> EQL pos }
+  "\\"       { \pos _ -> LAM pos }
+  "->"       { \pos _ -> ARROW pos }
+  "if"       { \pos _ -> IF pos }
+  "then"     { \pos _ -> THEN pos }
+  "else"     { \pos _ -> ELSE pos }
 
   -- DO NOT CHANGE ANYTHING AFTER THIS LINE ------------------------------------
   ------------------------------------------------------------------------------

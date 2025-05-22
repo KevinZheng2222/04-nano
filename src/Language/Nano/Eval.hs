@@ -165,12 +165,69 @@ exitError (Error msg) = return (VErr msg)
 --------------------------------------------------------------------------------
 eval :: Env -> Expr -> Value
 --------------------------------------------------------------------------------
-eval = error "TBD:eval"
+eval _   (EInt n) = VInt n
+eval _   (EBool n)         = VBool n
+eval env (EVar x)         = lookupId x env
+
+eval env (EBin o e1 e2)   =
+  let v1 = eval env e1
+      v2 = eval env e2
+  in evalOp o v1 v2
+
+eval env (EIf p t f) =
+  case eval env p of
+    VBool True  -> eval env t
+    VBool False -> eval env f
+
+eval env (ELet x e1 e2) =
+  let v1 = case e1 of
+             ELam y body -> VRec x env y body
+             _           -> eval env e1
+      env' = (x, v1) : env
+  in eval env' e2
+
+eval env (EApp e1 e2) =
+  case eval env e1 of
+    VClos closEnv x body ->
+      let argVal = eval env e2
+          newEnv = (x, argVal) : closEnv
+      in eval newEnv body
+    VRec f recEnv x body ->
+      let argVal = eval env e2
+          newEnv = (x, argVal) : (f, VRec f recEnv x body) : recEnv
+      in eval newEnv body
+    VPrim f ->
+      let argVal = eval env e2
+      in f argVal
+    _ -> throw (Error "type error: application")
+
+eval _ ENil = VNil
+
+eval env (EBin Cons e1 e2) =
+  let v1 = eval env e1
+      v2 = eval env e2
+  in VCons v1 v2
+
+eval env (ELam x e) = VClos env x e
 
 --------------------------------------------------------------------------------
 evalOp :: Binop -> Value -> Value -> Value
 --------------------------------------------------------------------------------
-evalOp = error "TBD:evalOp"
+evalOp Plus  (VInt a) (VInt b) = VInt (a + b)
+evalOp Minus (VInt a) (VInt b) = VInt (a - b)
+evalOp Mul   (VInt a) (VInt b) = VInt (a * b)
+evalOp Eq  (VInt a)  (VInt b)  = VBool (a == b)
+evalOp Ne  (VInt a)  (VInt b)  = VBool (a /= b)
+evalOp Lt  (VInt a)  (VInt b)  = VBool (a < b)
+evalOp Le  (VInt a)  (VInt b)  = VBool (a <= b)
+evalOp Eq  (VBool a) (VBool b) = VBool (a == b)
+evalOp Ne  (VBool a) (VBool b) = VBool (a /= b)
+evalOp Lt  (VBool a) (VBool b) = VBool (a < b)
+evalOp Le  (VBool a) (VBool b) = VBool (a <= b)
+evalOp And (VBool a) (VBool b) = VBool (a && b)
+evalOp Or  (VBool a) (VBool b) = VBool (a || b)
+evalOp Cons v1 v2 = VCons v1 v2
+evalOp _ _ _ = throw (Error "type error: binop")
 
 --------------------------------------------------------------------------------
 -- | `lookupId x env` returns the most recent
@@ -189,13 +246,26 @@ evalOp = error "TBD:evalOp"
 --------------------------------------------------------------------------------
 lookupId :: Id -> Env -> Value
 --------------------------------------------------------------------------------
-lookupId = error "TBD:lookupId"
+lookupId x [] = throw (Error ("unbound variable: " ++ x))
+lookupId x ((y, v):env)
+  | x == y    = v
+  | otherwise = lookupId x env
 
 prelude :: Env
 prelude =
   [ -- HINT: you may extend this "built-in" environment
     -- with some "operators" that you find useful...
+    ("head", VPrim primHead)
+  , ("tail", VPrim primTail)
   ]
+
+primHead :: Value -> Value
+primHead (VCons x _) = x
+primHead _           = throw (Error "type error: head")
+
+primTail :: Value -> Value
+primTail (VCons _ xs) = xs
+primTail _            = throw (Error "type error: tail")
 
 env0 :: Env
 env0 =  [ ("z1", VInt 0)
